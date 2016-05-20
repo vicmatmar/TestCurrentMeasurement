@@ -8,6 +8,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using System.IO;
 
 using System.IO.Ports;
 
@@ -18,47 +19,57 @@ namespace PowerCalibration
         MultiMeter _meter = null; // The multimeter controller
 
         delegate void setControlPropertyValueCallback(Control control, object value, string property_name);  // Set object text
+        delegate void updateGUICallback(power_data data);
 
-        Task _measure_task;
+        Task _meter_task;
         CancellationTokenSource _cancel;
+
+        double _max_val = double.MinValue, _min_val = double.MaxValue;
+        double _average = 0.0;
+        uint _read_count = 0;
+
+        struct power_data
+        {
+            public double current;
+            public double voltage;
+        }
 
         public Form1()
         {
             InitializeComponent();
-
-            button1.Text = "Start";
-            create_task();
         }
 
+        /// <summary>
+        /// Init GUI, meter and start to take measurements
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
         private void Form1_Load(object sender, EventArgs e)
         {
-
-            labelVoltage.Text = "";
-            labelCurrent.Text = "";
-            labelPower.Text = "";
-
-
+            // Setup meter
             autoDetectMeterCOMPort();
             _meter.Init();
 
             _meter.ConfDisplay("CURR:DC 50", 1);
             _meter.ConfDisplay("VOLT:DC 5", 2);
 
-            start_task();
         }
 
-        void measure_error(Task task)
+        /// <summary>
+        /// Called when the measure task throws an exception
+        /// </summary>
+        /// <param name="task"></param>
+        void meter_error(Task task)
         {
             string text = textBoxOutputStatus.Text;
             text += "\r\n" + task.Exception.InnerException.Message;
 
-            controlSetPropertiValue(textBoxOutputStatus, text);
-            controlSetPropertiValue(button1, "Start");
+            controlSetPropertyValue(textBoxOutputStatus, text);
+            controlSetPropertyValue(button1, "Start");
         }
 
         /// <summary>
         /// Detects whether the meter is ON and connected to one of the COM ports
-        /// If one is found, the serial port setting is changed automatically
         /// </summary>
         /// <returns>Whether a meter was detected connected to the system</returns>
         bool autoDetectMeterCOMPort()
@@ -103,14 +114,14 @@ namespace PowerCalibration
         }
 
         /// <summary>
-        /// Updates the output status text box and log file
+        /// Updates the output status text box
         /// </summary>
         /// <param name="text"></param>
         void updateOutputStatus(string text)
         {
             string line = string.Format("{0:G}: {1}", DateTime.Now, text);
             line = string.Format("{0}\r\n", line);
-            controlSetPropertiValue(this.textBoxOutputStatus, line);
+            controlSetPropertyValue(this.textBoxOutputStatus, line);
         }
 
         /// <summary>
@@ -118,11 +129,11 @@ namespace PowerCalibration
         /// </summary>
         /// <param name="control"></param>
         /// <param name="value"></param>
-        void controlSetPropertiValue(Control control, object value, string property_name = "Text")
+        void controlSetPropertyValue(Control control, object value, string property_name = "Text")
         {
             if (control.InvokeRequired)
             {
-                setControlPropertyValueCallback d = new setControlPropertyValueCallback(controlSetPropertiValue);
+                setControlPropertyValueCallback d = new setControlPropertyValueCallback(controlSetPropertyValue);
                 this.Invoke(d, new object[] { control, value, property_name });
             }
             else
@@ -153,25 +164,25 @@ namespace PowerCalibration
         }
 
         /// <summary>
-        /// Starts the task if not running
+        /// Starts the task
         /// </summary>
         void start_task()
         {
-            if (_measure_task.Status != TaskStatus.Running)
-            {
-                if (_measure_task.IsCompleted)
-                    create_task();
-                _measure_task.Start();
-            }
-
             button1.Text = "Stop";
+
+            create_task();
+            _meter_task.Start();
         }
 
+        /// <summary>
+        /// Creates the task and cancelation source
+        /// </summary>
         void create_task()
         {
             _cancel = new CancellationTokenSource();
-            _measure_task = new Task(measure, _cancel.Token);
-            _measure_task.ContinueWith(measure_error, TaskContinuationOptions.OnlyOnFaulted);
+            _meter_task = new Task(meter_run, _cancel.Token);
+            _meter_task.ContinueWith(meter_completed, TaskContinuationOptions.OnlyOnRanToCompletion);
+            _meter_task.ContinueWith(meter_error, TaskContinuationOptions.OnlyOnFaulted);
         }
 
         /// <summary>
@@ -179,16 +190,54 @@ namespace PowerCalibration
         /// </summary>
         void cancel_task()
         {
+
             if (_cancel != null && _cancel.Token.CanBeCanceled)
                 _cancel.Cancel();
-            Task.WaitAll();
+
             button1.Text = "Start";
+
+        }
+
+        void meter_completed(Task task)
+        {
+        }
+
+        void update_gui(power_data data)
+        {
+
+            if (this.InvokeRequired)
+            {
+                updateGUICallback d = new updateGUICallback(update_gui);
+                this.Invoke(d, new object[] { data });
+            }
+            else
+            {
+
+                double power = data.voltage * data.current;
+
+                if (power > _max_val)
+                    _max_val = power;
+                if (power < _min_val)
+                    _min_val = power;
+
+                _read_count++;
+
+                _average = (_average * (_read_count - 1) + power) / _read_count;
+
+                labelVoltage.Text = string.Format("{0:F4} V", data.voltage);
+                labelCurrent.Text = string.Format("{0:F3} mA", data.current);
+                labelPower.Text = string.Format("{0:F6} mW", power);
+                labelMax.Text = string.Format("{0:F6} mW", _max_val);
+                labelMin.Text = string.Format("{0:F6} mW", _min_val);
+                labelSamples.Text = string.Format("{0}", _read_count);
+                labelAve.Text = string.Format("{0:F6} mW", _average);
+            }
         }
 
         /// <summary>
         /// Takes meter measurements until cancel
         /// </summary>
-        void measure()
+        void meter_run()
         {
             while (true)
             {
@@ -199,9 +248,12 @@ namespace PowerCalibration
 
                 double[] values = _meter.Read();
 
-                controlSetPropertiValue(labelVoltage, string.Format("{0:F4}V", values[0]));
-                controlSetPropertiValue(labelCurrent, string.Format("{0:F3}mA", values[1]));
-                controlSetPropertiValue(labelPower, string.Format("{0:F4}mW", values[0] * values[1]));
+                power_data data = new power_data();
+                data.voltage = values[0];
+                data.current = values[1];
+
+                update_gui(data);
+
             }
         }
 
@@ -217,8 +269,8 @@ namespace PowerCalibration
             {
                 start_task();
             }
-            else 
-            { 
+            else
+            {
                 cancel_task();
             }
 

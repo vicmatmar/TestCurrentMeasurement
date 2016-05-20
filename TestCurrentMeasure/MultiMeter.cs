@@ -31,6 +31,8 @@ namespace PowerCalibration
         private Models _model = Models.NONE;
         public Models Model { get { return _model; } }
 
+        int _read_delay = 0;
+
         /// <summary>
         /// Constructor
         /// </summary>
@@ -67,12 +69,17 @@ namespace PowerCalibration
             //}
             //_serialPort = new SerialPort(_portName, 600, Parity.None, 8, StopBits.One);
             _serialPort.PortName = _portName;
-            _serialPort.BaudRate = 9600;
+            //_serialPort.BaudRate = 9600;
+            _serialPort.BaudRate = 115200;
             _serialPort.Parity = Parity.None;
             _serialPort.DataBits = 8;
             _serialPort.StopBits = StopBits.One;
             _serialPort.Handshake = Handshake.None;
             _serialPort.DtrEnable = true;
+
+            // Calculated using GDM8341 and reading two displays
+            // May need to adjust for different meter, computer or more data coming across the port
+            _read_delay = (_serialPort.BaudRate - 131446) / -1624;
 
             try
             {
@@ -107,8 +114,8 @@ namespace PowerCalibration
             int n = 0;
             while (_value_txt == "")
             {
-                Thread.Sleep(100);
-                if (n++ > 5)
+                Thread.Sleep(_read_delay);
+                if (n++ > 10)
                 {
                     break;
                 }
@@ -116,7 +123,7 @@ namespace PowerCalibration
             n = 0;
             while (_serialPort.BytesToRead > 0)
             {
-                Thread.Sleep(250);
+                Thread.Sleep(_read_delay);
                 if (n++ > 10)
                 {
                     break;
@@ -132,6 +139,7 @@ namespace PowerCalibration
         void clearData()
         {
             //lock (_value_txt)
+            _serialPort.ReadExisting();
             _value_txt = "";
         }
 
@@ -346,11 +354,21 @@ namespace PowerCalibration
             switch (Model)
             {
                 case Models.GDM8341:
-                    writeLine("READ?");
+                    //writeLine("READ?");
+                    _serialPort.WriteLine("READ?");
+
                     string data = waitForData();
-                    string[] valstr = data.Split(',');
-                    values[0] = Convert.ToDouble(valstr[0]);
-                    values[1] = Convert.ToDouble(valstr[1]);
+                    try
+                    {
+                        string[] valstr = data.Split(',');
+                        values[0] = Convert.ToDouble(valstr[0]);
+                        values[1] = Convert.ToDouble(valstr[1]);
+                    }
+                    catch (Exception ex)
+                    {
+                        string msg = ex.Message;
+                        throw;
+                    }
                     break;
                 default:
                     throw new Exception("Unsupported model: " + Model);
@@ -420,9 +438,12 @@ namespace PowerCalibration
             {
                 writeLine("TRIG:SOUR BUS");
                 writeLine("INIT");
+                writeLine("*TRG");
             }
-
-            writeLine("*TRG");
+            else
+            {
+                _serialPort.WriteLine("*TRG");
+            }
         }
 
         /// <summary>
