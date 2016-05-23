@@ -32,6 +32,7 @@ namespace PowerCalibration
         {
             public double current;
             public double voltage;
+            public DateTime time_stamp;
         }
 
         public Form1()
@@ -52,6 +53,8 @@ namespace PowerCalibration
 
             _meter.ConfDisplay("CURR:DC 50", 1);
             _meter.ConfDisplay("VOLT:DC 5", 2);
+
+            init_chart();
 
         }
 
@@ -146,7 +149,6 @@ namespace PowerCalibration
             }
         }
 
-
         /// <summary>
         /// Process cmd key events
         /// </summary>
@@ -202,9 +204,76 @@ namespace PowerCalibration
         {
         }
 
+        void init_chart()
+        {
+            string name = "Power";
+            chart1.Series.Add(name);
+            chart1.Series[name].ChartType = System.Windows.Forms.DataVisualization.Charting.SeriesChartType.Line;
+
+            //chart1.ChartAreas[0].AxisY.ScaleView.Zoom(0, 10);
+
+            chart1.ChartAreas[0].CursorX.IsUserEnabled = true;
+            chart1.ChartAreas[0].CursorX.IsUserSelectionEnabled = true;
+            chart1.ChartAreas[0].AxisX.ScaleView.Zoomable = true;
+
+
+            chart1.ChartAreas[0].CursorY.IsUserEnabled = true;
+            chart1.ChartAreas[0].CursorY.IsUserSelectionEnabled = true;
+            chart1.ChartAreas[0].AxisY.ScaleView.Zoomable = true;
+
+
+            chart1.Series[name].XValueType = System.Windows.Forms.DataVisualization.Charting.ChartValueType.DateTime;
+            chart1.ChartAreas[0].AxisX.IntervalType = System.Windows.Forms.DataVisualization.Charting.DateTimeIntervalType.Auto;
+            //chart1.ChartAreas[0].AxisX.Interval = 1;
+
+        }
+
+        void update_chart(power_data data)
+        {
+            if (chart1.InvokeRequired)
+            {
+                updateGUICallback d = new updateGUICallback(update_chart);
+                this.Invoke(d, new object[] { data });
+            }
+            else
+            {
+                try
+                {
+                    chart1.Series["Power"].Points.AddXY(data.time_stamp.ToLongTimeString(), data.current * data.voltage);
+                }
+                catch (Exception ex)
+                {
+                    string msg = ex.Message;
+                }
+            }
+        }
+
         void update_gui(power_data data)
         {
 
+            controlSetPropertyValue(labelVoltage, string.Format("{0:F4} V", data.voltage));
+            controlSetPropertyValue(labelCurrent, string.Format("{0:F3} mA", data.current));
+            controlSetPropertyValue(labelSamples, string.Format("{0}", _read_count));
+
+            update_chart(data);
+
+            double power = data.voltage * data.current;
+
+            if (power > _max_val)
+                _max_val = power;
+            if (power < _min_val)
+                _min_val = power;
+
+            _read_count++;
+
+            _average = (_average * (_read_count - 1) + power) / _read_count;
+
+            controlSetPropertyValue(labelPower, string.Format("{0:F6} mW", power));
+            controlSetPropertyValue(labelMax, string.Format("{0:F6} mW", _max_val));
+            controlSetPropertyValue(labelMin, string.Format("{0:F6} mW", _min_val));
+            controlSetPropertyValue(labelAve, string.Format("{0:F6} mW", _average));
+
+            /*
             if (this.InvokeRequired)
             {
                 updateGUICallback d = new updateGUICallback(update_gui);
@@ -224,14 +293,17 @@ namespace PowerCalibration
 
                 _average = (_average * (_read_count - 1) + power) / _read_count;
 
-                labelVoltage.Text = string.Format("{0:F4} V", data.voltage);
-                labelCurrent.Text = string.Format("{0:F3} mA", data.current);
+                //labelVoltage.Text = string.Format("{0:F4} V", data.voltage);
+                //labelCurrent.Text = string.Format("{0:F3} mA", data.current);
+                
                 labelPower.Text = string.Format("{0:F6} mW", power);
                 labelMax.Text = string.Format("{0:F6} mW", _max_val);
                 labelMin.Text = string.Format("{0:F6} mW", _min_val);
-                labelSamples.Text = string.Format("{0}", _read_count);
+                
+                //labelSamples.Text = string.Format("{0}", _read_count);
                 labelAve.Text = string.Format("{0:F6} mW", _average);
-            }
+
+            }*/
         }
 
         /// <summary>
@@ -249,6 +321,8 @@ namespace PowerCalibration
                 double[] values = _meter.Read();
 
                 power_data data = new power_data();
+                data.time_stamp = DateTime.Now;
+
                 data.voltage = values[0];
                 data.current = values[1];
 
@@ -275,6 +349,7 @@ namespace PowerCalibration
             }
 
         }
+
 
     }
 }
