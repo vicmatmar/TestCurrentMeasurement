@@ -134,9 +134,9 @@ namespace PowerCalibration
         }
 
         /// <summary>
-        /// Clears our data holder
+        /// Clears data buffer
         /// </summary>
-        void clearData()
+        public void ClearData()
         {
             //lock (_value_txt)
             _serialPort.ReadExisting();
@@ -200,7 +200,7 @@ namespace PowerCalibration
         /// <returns>meter id string</returns>
         public string IDN()
         {
-            clearData();
+            ClearData();
             writeLine("*IDN?");
             string data = waitForData();
 
@@ -347,36 +347,40 @@ namespace PowerCalibration
         /// Send Read? command and returns values
         /// </summary>
         /// <returns></returns>
-        public double[] Read()
+        public string Read()
         {
-            double[] values = new double[] { 0.0, 0.0 };
-            clearData();
+            string data = "";
             switch (Model)
             {
                 case Models.GDM8341:
-                    //writeLine("READ?");
                     _serialPort.WriteLine("READ?");
-
-                    string data = waitForData();
-                    try
-                    {
-                        string[] valstr = data.Split(',');
-                        values[0] = Convert.ToDouble(valstr[0]);
-                        values[1] = Convert.ToDouble(valstr[1]);
-                    }
-                    catch (Exception ex)
-                    {
-                        string msg = ex.Message;
-                        throw;
-                    }
+                    data = waitForData();
                     break;
                 default:
                     throw new Exception("Unsupported model: " + Model);
             }
 
-            return values;
+            return data;
         }
 
+        /// <summary>
+        /// Sets the sampling rate SENSe:DETector:RATE
+        /// </summary>
+        /// <param name="rate">RATE(S | M | F).  Defaults to 'S'</param>
+        public void SetSampleRate(char rate)
+        {
+            switch (Model)
+            {
+                case Models.GDM8341:
+                    rate = Char.ToUpper(rate);
+                    if ( rate != 'S' && rate != 'M' && rate != 'F')
+                        rate = 'S';
+                    writeLine("SENS:DET:RATE " + rate);
+                    break;
+                default:
+                    throw new Exception("Unsupported model: " + Model);
+            }
+        }
         /// <summary>
         /// Sets up the meter for Resistance measurement
         /// Only GDM8341
@@ -452,7 +456,7 @@ namespace PowerCalibration
         /// <returns>measurement</returns>
         public string Measure()
         {
-            clearData();
+            ClearData();
 
             Triger();
 

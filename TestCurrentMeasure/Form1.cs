@@ -35,6 +35,8 @@ namespace PowerCalibration
             public DateTime time_stamp;
         }
 
+        List<power_data> data_list = new List<power_data>();
+
         public Form1()
         {
             InitializeComponent();
@@ -53,6 +55,10 @@ namespace PowerCalibration
 
             _meter.ConfDisplay("CURR:DC 50", 1);
             _meter.ConfDisplay("VOLT:DC 5", 2);
+
+            radioButtonFast.Checked = true;
+            //radioButtonMedium.Checked = true;
+            //radioButtonSlow.Checked = true;
 
             init_chart();
 
@@ -253,7 +259,7 @@ namespace PowerCalibration
 
             controlSetPropertyValue(labelVoltage, string.Format("{0:F4} V", data.voltage));
             controlSetPropertyValue(labelCurrent, string.Format("{0:F3} mA", data.current));
-            controlSetPropertyValue(labelSamples, string.Format("{0}", _read_count));
+            controlSetPropertyValue(labelSamples, string.Format("{0}", _read_count++));
 
             update_chart(data);
 
@@ -264,46 +270,12 @@ namespace PowerCalibration
             if (power < _min_val)
                 _min_val = power;
 
-            _read_count++;
-
             _average = (_average * (_read_count - 1) + power) / _read_count;
 
             controlSetPropertyValue(labelPower, string.Format("{0:F6} mW", power));
             controlSetPropertyValue(labelMax, string.Format("{0:F6} mW", _max_val));
             controlSetPropertyValue(labelMin, string.Format("{0:F6} mW", _min_val));
             controlSetPropertyValue(labelAve, string.Format("{0:F6} mW", _average));
-
-            /*
-            if (this.InvokeRequired)
-            {
-                updateGUICallback d = new updateGUICallback(update_gui);
-                this.Invoke(d, new object[] { data });
-            }
-            else
-            {
-
-                double power = data.voltage * data.current;
-
-                if (power > _max_val)
-                    _max_val = power;
-                if (power < _min_val)
-                    _min_val = power;
-
-                _read_count++;
-
-                _average = (_average * (_read_count - 1) + power) / _read_count;
-
-                //labelVoltage.Text = string.Format("{0:F4} V", data.voltage);
-                //labelCurrent.Text = string.Format("{0:F3} mA", data.current);
-                
-                labelPower.Text = string.Format("{0:F6} mW", power);
-                labelMax.Text = string.Format("{0:F6} mW", _max_val);
-                labelMin.Text = string.Format("{0:F6} mW", _min_val);
-                
-                //labelSamples.Text = string.Format("{0}", _read_count);
-                labelAve.Text = string.Format("{0:F6} mW", _average);
-
-            }*/
         }
 
         /// <summary>
@@ -317,16 +289,22 @@ namespace PowerCalibration
                     return;
 
                 _meter.Triger();
-
-                double[] values = _meter.Read();
-
-                power_data data = new power_data();
-                data.time_stamp = DateTime.Now;
-
-                data.voltage = values[0];
-                data.current = values[1];
-
-                update_gui(data);
+                _meter.ClearData();
+                string meter_output = _meter.Read();
+                try
+                {
+                    string[] valstr = meter_output.Split(',');
+                    power_data data = new power_data();
+                    data.time_stamp = DateTime.Now;
+                    data.voltage = Convert.ToDouble(valstr[0]);
+                    data.current = Convert.ToDouble(valstr[1]);
+                    data_list.Add(data);
+                    update_gui(data);
+                }
+                catch (Exception ex)
+                {
+                    updateOutputStatus(ex.Message);
+                }
 
             }
         }
@@ -346,8 +324,36 @@ namespace PowerCalibration
             else
             {
                 cancel_task();
+
+                StreamWriter sw = new StreamWriter("test.txt");
+                foreach (power_data data in data_list)
+                {
+                    sw.WriteLine("{0},{1},{2}", data.time_stamp.ToString("MM/dd/yyyy hh:mm:ss.fff tt"), data.voltage, data.current);
+                }
+                sw.Close();
             }
 
+        }
+
+        private void radioButtonSampleRate_CheckedChanged(object sender, EventArgs e)
+        {
+
+            RadioButton cb = sender as RadioButton;
+            if (cb != null && cb.Checked)
+            {
+                if (radioButtonFast.Checked)
+                {
+                    _meter.SetSampleRate('F');
+                }
+                else if (radioButtonMedium.Checked)
+                {
+                    _meter.SetSampleRate('M');
+                }
+                else if (radioButtonSlow.Checked)
+                {
+                    _meter.SetSampleRate('S');
+                }
+            }
         }
 
 
