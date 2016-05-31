@@ -22,9 +22,16 @@ namespace PowerCalibration
             get { return this._serialPort.IsOpen; }
         }
 
-        private bool _waitForDsrHolding = true;
+
         private string _portName;
+
         private SerialPort _serialPort;
+        public SerialPort SerialPort
+        {
+            get { return this._serialPort; }
+        }
+
+        private bool _waitForDsrHolding = true;
         private string _value_txt = "";
 
         public enum Models { NONE, HP34401A, GDM8341 };
@@ -109,12 +116,12 @@ namespace PowerCalibration
         /// Waits for data
         /// </summary>
         /// <returns></returns>
-        string waitForData()
+        public string WaitForData(int sampling_delay_ms)
         {
             int n = 0;
             while (_value_txt == "")
             {
-                Thread.Sleep(_read_delay);
+                Thread.Sleep(sampling_delay_ms);
                 if (n++ > 10)
                 {
                     break;
@@ -123,7 +130,7 @@ namespace PowerCalibration
             n = 0;
             while (_serialPort.BytesToRead > 0)
             {
-                Thread.Sleep(_read_delay);
+                Thread.Sleep(sampling_delay_ms);
                 if (n++ > 10)
                 {
                     break;
@@ -139,7 +146,6 @@ namespace PowerCalibration
         public void ClearData()
         {
             //lock (_value_txt)
-            _serialPort.ReadExisting();
             _value_txt = "";
         }
 
@@ -147,7 +153,7 @@ namespace PowerCalibration
         /// Writes to meter
         /// </summary>
         /// <param name="cmd"></param>
-        public void writeLine(string cmd)
+        public void WriteLine(string cmd)
         {
             int n;
             if (_waitForDsrHolding)
@@ -183,7 +189,7 @@ namespace PowerCalibration
         /// </summary>
         public void ClearError()
         {
-            writeLine("*CLS");
+            WriteLine("*CLS");
         }
 
         /// <summary>
@@ -191,7 +197,7 @@ namespace PowerCalibration
         /// </summary>
         public void SetToRemote()
         {
-            writeLine("SYST:REM");
+            WriteLine("SYST:REM");
         }
 
         /// <summary>
@@ -201,8 +207,8 @@ namespace PowerCalibration
         public string IDN()
         {
             ClearData();
-            writeLine("*IDN?");
-            string data = waitForData();
+            WriteLine("*IDN?");
+            string data = WaitForData(100);
 
             if (data.StartsWith("HEWLETT-PACKARD,34401A"))
                 _model = Models.HP34401A;
@@ -234,10 +240,10 @@ namespace PowerCalibration
                     break;
                 case Models.GDM8341:
                     WaitForDsrHolding = false;  // don't use hardware handshake
-                    writeLine("SYST:SCP:MODE COMP");  //Compatible to GDM8246
-                    writeLine("TRIG:SOUR EXT");  // Set trigger to be external
-                    writeLine("TRIG:COUN 1");  // Set trigger COUNT
-                    writeLine("TRIG:AUTO OFF");  // Turn auto trigger off
+                    WriteLine("SYST:SCP:MODE COMP");  //Compatible to GDM8246
+                    WriteLine("TRIG:SOUR EXT");  // Set trigger to be external
+                    WriteLine("TRIG:COUN 1");  // Set trigger COUNT
+                    WriteLine("TRIG:AUTO OFF");  // Turn auto trigger off
                     break;
                 default:
                     throw new Exception("Unsupported model: " + Model);
@@ -252,10 +258,10 @@ namespace PowerCalibration
             switch (Model)
             {
                 case Models.HP34401A:
-                    writeLine(":CONF:VOLT:AC 1000,0.01");
+                    WriteLine(":CONF:VOLT:AC 1000,0.01");
                     break;
                 case Models.GDM8341:
-                    writeLine("CONF:VOLT:AC 500");
+                    WriteLine("CONF:VOLT:AC 500");
                     Thread.Sleep(1000);
                     break;
                 default:
@@ -271,10 +277,10 @@ namespace PowerCalibration
             switch (Model)
             {
                 case Models.HP34401A:
-                    writeLine(":CONF:VOLT:DC 10,0.01");
+                    WriteLine(":CONF:VOLT:DC 10,0.01");
                     break;
                 case Models.GDM8341:
-                    writeLine("CONF:VOLT:DC 5");
+                    WriteLine("CONF:VOLT:DC 5");
                     Thread.Sleep(1000);
                     break;
                 default:
@@ -290,12 +296,12 @@ namespace PowerCalibration
             switch (Model)
             {
                 case Models.HP34401A:
-                    writeLine(":CONF:CURR:AC 1,0.000001");
+                    WriteLine(":CONF:CURR:AC 1,0.000001");
                     break;
                 case Models.GDM8341:
                     // Note that input should be on white 0.5 A terminal
                     // Make sure COM is set to COMMun
-                    writeLine("CONF:CURR:AC 500");
+                    WriteLine("CONF:CURR:AC 500");
                     Thread.Sleep(1000);
                     break;
                 default:
@@ -315,7 +321,7 @@ namespace PowerCalibration
                 case Models.GDM8341:
                     // Note that input should be on white 0.5 A terminal
                     // Make sure COM is set to COMMun
-                    writeLine("CONF:CURR:DC " + range);
+                    WriteLine("CONF:CURR:DC " + range);
                     break;
             }
         }
@@ -336,7 +342,7 @@ namespace PowerCalibration
                         conf = "CONF2";
 
                     string cmd = string.Format("{0}:{1}", conf, setting);
-                    writeLine(cmd);
+                    WriteLine(cmd);
                     break;
                 default:
                     throw new Exception("Unsupported model: " + Model);
@@ -353,8 +359,9 @@ namespace PowerCalibration
             switch (Model)
             {
                 case Models.GDM8341:
+                    ClearData();
                     _serialPort.WriteLine("READ?");
-                    data = waitForData();
+                    data = WaitForData(100);
                     break;
                 default:
                     throw new Exception("Unsupported model: " + Model);
@@ -375,7 +382,7 @@ namespace PowerCalibration
                     rate = Char.ToUpper(rate);
                     if ( rate != 'S' && rate != 'M' && rate != 'F')
                         rate = 'S';
-                    writeLine("SENS:DET:RATE " + rate);
+                    WriteLine("SENS:DET:RATE " + rate);
                     break;
                 default:
                     throw new Exception("Unsupported model: " + Model);
@@ -392,7 +399,7 @@ namespace PowerCalibration
             {
                 case Models.GDM8341:
                     string conf = "CONF:RES " + range;
-                    writeLine(conf);
+                    WriteLine(conf);
                     break;
                 default:
                     throw new Exception("Unsupported model: " + Model);
@@ -408,7 +415,7 @@ namespace PowerCalibration
             switch (Model)
             {
                 case Models.GDM8341:
-                    writeLine("CONF:CONT");
+                    WriteLine("CONF:CONT");
                     break;
                 default:
                     throw new Exception("Unsupported model: " + Model);
@@ -426,7 +433,7 @@ namespace PowerCalibration
             {
                 case Models.GDM8341:
                     string conf = string.Format("CONF:CAP {0}", range);
-                    writeLine(conf);
+                    WriteLine(conf);
                     break;
                 default:
                     throw new Exception("Unsupported model: " + Model);
@@ -436,13 +443,13 @@ namespace PowerCalibration
         /// <summary>
         /// Sends TRG command
         /// </summary>
-        public void Triger()
+        public void Trigger()
         {
             if (Model == Models.HP34401A)
             {
-                writeLine("TRIG:SOUR BUS");
-                writeLine("INIT");
-                writeLine("*TRG");
+                WriteLine("TRIG:SOUR BUS");
+                WriteLine("INIT");
+                WriteLine("*TRG");
             }
             else
             {
@@ -458,21 +465,21 @@ namespace PowerCalibration
         {
             ClearData();
 
-            Triger();
+            Trigger();
 
             switch (Model)
             {
                 case Models.HP34401A:
-                    writeLine(":FETC?");
+                    WriteLine(":FETC?");
                     break;
                 case Models.GDM8341:
-                    writeLine("VAL1?");
+                    WriteLine("VAL1?");
                     break;
                 default:
                     throw new Exception("Unsupported model: " + Model);
             }
 
-            string data = waitForData();
+            string data = WaitForData(100);
             //data = data.TrimEnd(new char[] { '\r', '\n' });
 
             return data;

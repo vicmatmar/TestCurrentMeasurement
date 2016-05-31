@@ -29,8 +29,8 @@
         private void InitializeComponent()
         {
             this.components = new System.ComponentModel.Container();
-            System.Windows.Forms.DataVisualization.Charting.ChartArea chartArea4 = new System.Windows.Forms.DataVisualization.Charting.ChartArea();
-            System.Windows.Forms.DataVisualization.Charting.Legend legend4 = new System.Windows.Forms.DataVisualization.Charting.Legend();
+            System.Windows.Forms.DataVisualization.Charting.ChartArea chartArea1 = new System.Windows.Forms.DataVisualization.Charting.ChartArea();
+            System.Windows.Forms.DataVisualization.Charting.Legend legend1 = new System.Windows.Forms.DataVisualization.Charting.Legend();
             this.textBoxOutputStatus = new System.Windows.Forms.TextBox();
             this.timer1 = new System.Windows.Forms.Timer(this.components);
             this.button1 = new System.Windows.Forms.Button();
@@ -63,12 +63,12 @@
             | System.Windows.Forms.AnchorStyles.Right)));
             this.textBoxOutputStatus.Font = new System.Drawing.Font("Microsoft Sans Serif", 9.75F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.textBoxOutputStatus.ForeColor = System.Drawing.SystemColors.WindowText;
-            this.textBoxOutputStatus.Location = new System.Drawing.Point(12, 412);
+            this.textBoxOutputStatus.Location = new System.Drawing.Point(12, 403);
             this.textBoxOutputStatus.Multiline = true;
             this.textBoxOutputStatus.Name = "textBoxOutputStatus";
             this.textBoxOutputStatus.ReadOnly = true;
             this.textBoxOutputStatus.ScrollBars = System.Windows.Forms.ScrollBars.Both;
-            this.textBoxOutputStatus.Size = new System.Drawing.Size(666, 66);
+            this.textBoxOutputStatus.Size = new System.Drawing.Size(666, 137);
             this.textBoxOutputStatus.TabIndex = 3;
             this.textBoxOutputStatus.WordWrap = false;
             // 
@@ -310,13 +310,13 @@
             this.chart1.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
             | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
-            chartArea4.Name = "ChartArea1";
-            this.chart1.ChartAreas.Add(chartArea4);
-            legend4.Name = "Legend1";
-            this.chart1.Legends.Add(legend4);
+            chartArea1.Name = "ChartArea1";
+            this.chart1.ChartAreas.Add(chartArea1);
+            legend1.Name = "Legend1";
+            this.chart1.Legends.Add(legend1);
             this.chart1.Location = new System.Drawing.Point(13, 149);
             this.chart1.Name = "chart1";
-            this.chart1.Size = new System.Drawing.Size(665, 257);
+            this.chart1.Size = new System.Drawing.Size(665, 248);
             this.chart1.TabIndex = 16;
             this.chart1.Text = "chart1";
             // 
@@ -324,7 +324,7 @@
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(690, 490);
+            this.ClientSize = new System.Drawing.Size(690, 552);
             this.Controls.Add(this.chart1);
             this.Controls.Add(this.panel1);
             this.Controls.Add(this.textBoxOutputStatus);

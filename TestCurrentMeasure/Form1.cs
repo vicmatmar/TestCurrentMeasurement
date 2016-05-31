@@ -53,8 +53,16 @@ namespace PowerCalibration
             autoDetectMeterCOMPort();
             _meter.Init();
 
-            _meter.ConfDisplay("CURR:DC 50", 1);
+            _meter.WriteLine("*CLS");
+            _meter.WriteLine("SYST:SCP:MODE NORM");
+
+            _meter.WriteLine("TRIG:AUTO OFF");
+            _meter.WriteLine("TRIG:SOUR EXT");
+            _meter.WriteLine("TRIG:COUN 1");
+
+            _meter.ConfDisplay("CURR:DC 50E-03", 1);
             _meter.ConfDisplay("VOLT:DC 5", 2);
+
 
             radioButtonFast.Checked = true;
             //radioButtonMedium.Checked = true;
@@ -129,7 +137,7 @@ namespace PowerCalibration
         void updateOutputStatus(string text)
         {
             string line = string.Format("{0:G}: {1}", DateTime.Now, text);
-            line = string.Format("{0}\r\n", line);
+            line = string.Format("{0}{1}\r\n", textBoxOutputStatus.Text, line);
             controlSetPropertyValue(this.textBoxOutputStatus, line);
         }
 
@@ -176,7 +184,7 @@ namespace PowerCalibration
         /// </summary>
         void start_task()
         {
-            button1.Text = "Stop";
+            controlSetPropertyValue(button1, "Stop", "Text");
 
             create_task();
             _meter_task.Start();
@@ -202,12 +210,11 @@ namespace PowerCalibration
             if (_cancel != null && _cancel.Token.CanBeCanceled)
                 _cancel.Cancel();
 
-            button1.Text = "Start";
-
         }
 
         void meter_completed(Task task)
         {
+            controlSetPropertyValue(button1, "Start", "Text");
         }
 
         void init_chart()
@@ -256,23 +263,23 @@ namespace PowerCalibration
 
         void update_gui(power_data data)
         {
-
+            double current_ma = data.current * 1000;
             controlSetPropertyValue(labelVoltage, string.Format("{0:F4} V", data.voltage));
-            controlSetPropertyValue(labelCurrent, string.Format("{0:F3} mA", data.current));
+            controlSetPropertyValue(labelCurrent, string.Format("{0:F3} mA", current_ma));
             controlSetPropertyValue(labelSamples, string.Format("{0}", _read_count++));
 
             update_chart(data);
 
-            double power = data.voltage * data.current;
+            double power_mw = data.voltage * current_ma;
 
-            if (power > _max_val)
-                _max_val = power;
-            if (power < _min_val)
-                _min_val = power;
+            if (power_mw > _max_val)
+                _max_val = power_mw;
+            if (power_mw < _min_val)
+                _min_val = power_mw;
 
-            _average = (_average * (_read_count - 1) + power) / _read_count;
+            _average = (_average * (_read_count - 1) + power_mw) / _read_count;
 
-            controlSetPropertyValue(labelPower, string.Format("{0:F6} mW", power));
+            controlSetPropertyValue(labelPower, string.Format("{0:F6} mW", power_mw));
             controlSetPropertyValue(labelMax, string.Format("{0:F6} mW", _max_val));
             controlSetPropertyValue(labelMin, string.Format("{0:F6} mW", _min_val));
             controlSetPropertyValue(labelAve, string.Format("{0:F6} mW", _average));
@@ -283,27 +290,57 @@ namespace PowerCalibration
         /// </summary>
         void meter_run()
         {
+            _meter.ClearData();
             while (true)
             {
                 if (_cancel.Token.IsCancellationRequested)
                     return;
 
-                _meter.Triger();
+                power_data data = new power_data();
+                data.time_stamp = DateTime.Now;
+
                 _meter.ClearData();
-                string meter_output = _meter.Read();
-                try
+                _meter.WriteLine("*TRG;MEAS:CURR:DC? 50E-03");
+                bool success = false;
+                for (int i = 0; i < 3; i++)
                 {
-                    string[] valstr = meter_output.Split(',');
-                    power_data data = new power_data();
-                    data.time_stamp = DateTime.Now;
-                    data.voltage = Convert.ToDouble(valstr[0]);
-                    data.current = Convert.ToDouble(valstr[1]);
+                    string meter_output_current = _meter.WaitForData(100);
+                    try
+                    {
+                        data.current = Convert.ToDouble(meter_output_current);
+                        success = true;
+                        break;
+                    }
+                    catch (Exception ex)
+                    {
+                        success = false;
+                        updateOutputStatus("Current: " + ex.Message + " : " + meter_output_current.Replace("\r\n", ","));
+                    }
+                }
+
+                success = false;
+                _meter.ClearData();
+                _meter.WriteLine("*TRG;MEAS2:VOLT:DC? 5");
+                for (int i = 0; i < 3; i++)
+                {
+                    string meter_output_voltage = _meter.WaitForData(100);
+                    try
+                    {
+                        data.voltage = Convert.ToDouble(meter_output_voltage);
+                        success = true;
+                        break;
+                    }
+                    catch (Exception ex)
+                    {
+                        success = false;
+                        updateOutputStatus("Voltage: " + ex.Message + " : " + meter_output_voltage.Replace("\r\n", ","));
+                    }
+                }
+
+                if (success)
+                {
                     data_list.Add(data);
                     update_gui(data);
-                }
-                catch (Exception ex)
-                {
-                    updateOutputStatus(ex.Message);
                 }
 
             }
@@ -325,12 +362,13 @@ namespace PowerCalibration
             {
                 cancel_task();
 
+                /*
                 StreamWriter sw = new StreamWriter("test.txt");
                 foreach (power_data data in data_list)
                 {
                     sw.WriteLine("{0},{1},{2}", data.time_stamp.ToString("MM/dd/yyyy hh:mm:ss.fff tt"), data.voltage, data.current);
                 }
-                sw.Close();
+                sw.Close();*/
             }
 
         }
