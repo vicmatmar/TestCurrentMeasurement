@@ -64,9 +64,9 @@ namespace PowerCalibration
             _meter.ConfDisplay("VOLT:DC 5", 2);
 
 
-            radioButtonFast.Checked = true;
+            //radioButtonFast.Checked = true;
             //radioButtonMedium.Checked = true;
-            //radioButtonSlow.Checked = true;
+            radioButtonSlow.Checked = true;
 
             init_chart();
 
