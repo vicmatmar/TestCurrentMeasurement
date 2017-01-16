@@ -24,8 +24,8 @@ namespace PowerCalibration
         Task _meter_task;
         CancellationTokenSource _cancel;
 
-        double _max_val = double.MinValue, _min_val = double.MaxValue;
-        double _average = 0.0;
+        double _power_max_val = double.MinValue, _power_min_val = double.MaxValue;
+        double _power_average = 0.0;
         uint _read_count = 0;
 
         struct power_data
@@ -272,17 +272,17 @@ namespace PowerCalibration
 
             double power_mw = data.voltage * current_ma;
 
-            if (power_mw > _max_val)
-                _max_val = power_mw;
-            if (power_mw < _min_val)
-                _min_val = power_mw;
+            if (power_mw > _power_max_val)
+                _power_max_val = power_mw;
+            if (power_mw < _power_min_val)
+                _power_min_val = power_mw;
 
-            _average = (_average * (_read_count - 1) + power_mw) / _read_count;
+            _power_average = (_power_average * (_read_count - 1) + power_mw) / _read_count;
 
             controlSetPropertyValue(labelPower, string.Format("{0:F6} mW", power_mw));
-            controlSetPropertyValue(labelMax, string.Format("{0:F6} mW", _max_val));
-            controlSetPropertyValue(labelMin, string.Format("{0:F6} mW", _min_val));
-            controlSetPropertyValue(labelAve, string.Format("{0:F6} mW", _average));
+            controlSetPropertyValue(labelMax, string.Format("{0:F6} mW", _power_max_val));
+            controlSetPropertyValue(labelMin, string.Format("{0:F6} mW", _power_min_val));
+            controlSetPropertyValue(labelAve, string.Format("{0:F6} mW", _power_average));
         }
 
         /// <summary>
@@ -299,12 +299,12 @@ namespace PowerCalibration
                 power_data data = new power_data();
                 data.time_stamp = DateTime.Now;
 
+                bool success = false;
                 _meter.ClearData();
                 _meter.WriteLine("*TRG;MEAS:CURR:DC? 50E-03");
-                bool success = false;
                 for (int i = 0; i < 3; i++)
                 {
-                    string meter_output_current = _meter.WaitForData(100);
+                    string meter_output_current = _meter.WaitForData(50);
                     try
                     {
                         data.current = Convert.ToDouble(meter_output_current);
@@ -318,22 +318,25 @@ namespace PowerCalibration
                     }
                 }
 
-                success = false;
-                _meter.ClearData();
-                _meter.WriteLine("*TRG;MEAS2:VOLT:DC? 5");
-                for (int i = 0; i < 3; i++)
+                if (success)
                 {
-                    string meter_output_voltage = _meter.WaitForData(100);
-                    try
+                    success = false;
+                    _meter.ClearData();
+                    _meter.WriteLine("*TRG;MEAS2:VOLT:DC? 5");
+                    for (int i = 0; i < 3; i++)
                     {
-                        data.voltage = Convert.ToDouble(meter_output_voltage);
-                        success = true;
-                        break;
-                    }
-                    catch (Exception ex)
-                    {
-                        success = false;
-                        updateOutputStatus("Voltage: " + ex.Message + " : " + meter_output_voltage.Replace("\r\n", ","));
+                        string meter_output_voltage = _meter.WaitForData(50);
+                        try
+                        {
+                            data.voltage = Convert.ToDouble(meter_output_voltage);
+                            success = true;
+                            break;
+                        }
+                        catch (Exception ex)
+                        {
+                            success = false;
+                            updateOutputStatus("Voltage: " + ex.Message + " : " + meter_output_voltage.Replace("\r\n", ","));
+                        }
                     }
                 }
 
@@ -392,6 +395,14 @@ namespace PowerCalibration
                     _meter.SetSampleRate('S');
                 }
             }
+        }
+
+        private void button_reset_Click(object sender, EventArgs e)
+        {
+            _power_max_val = double.MinValue;
+            _power_min_val = double.MaxValue;
+            _read_count = 0;
+            _power_average = 0.0;
         }
 
 

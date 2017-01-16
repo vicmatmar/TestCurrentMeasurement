@@ -76,8 +76,8 @@ namespace PowerCalibration
             //}
             //_serialPort = new SerialPort(_portName, 600, Parity.None, 8, StopBits.One);
             _serialPort.PortName = _portName;
-            _serialPort.BaudRate = 9600;
-            //_serialPort.BaudRate = 115200;
+            //_serialPort.BaudRate = 9600;
+            _serialPort.BaudRate = 115200;
             _serialPort.Parity = Parity.None;
             _serialPort.DataBits = 8;
             _serialPort.StopBits = StopBits.One;
@@ -147,6 +147,8 @@ namespace PowerCalibration
         {
             //lock (_value_txt)
             _value_txt = "";
+            if (_serialPort.IsOpen)
+                _serialPort.ReadExisting();
         }
 
         /// <summary>
